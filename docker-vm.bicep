@@ -181,6 +181,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2023-07-01' = {
       networkInterfaces: [
         {
           id: nic.id
+          properties: { primary: true }
         }
       ]
     }
@@ -188,7 +189,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2023-07-01' = {
 }
 
 // --- Custom Script Extension to install Docker ---
-resource vmDockerExtension 'Microsoft.Compute/virtualMachines/extensions@2023-07-01' = {
+resource vmDockerExtension 'Microsoft.Compute/virtualMachines/extensions@2023-09-01' = {
   parent: vm
   name: 'InstallDocker'
   location: location
@@ -206,7 +207,7 @@ resource vmDockerExtension 'Microsoft.Compute/virtualMachines/extensions@2023-07
       script: base64(format(
         '''#!/bin/bash
         sudo apt-get update -y
-        sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common gnupg lsb-release
+        sudo apt-get install -y apt-transport-https ca-certificates curl wget software-properties-common gnupg lsb-release git
 
         # Add Docker's official GPG key
         sudo install -m 0755 -d /etc/apt/keyrings
@@ -244,6 +245,18 @@ resource vmDockerExtension 'Microsoft.Compute/virtualMachines/extensions@2023-07
         echo "Docker installation and configuration complete."
         # A reboot might be needed for group changes to take full effect for interactive shells,
         # but for Docker context via SSH, it should work.
+
+        # Install kubectl
+        curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | tee /etc/apt/sources.list.d/kubernetes.list
+        apt-get update && apt-get install -y kubectl
+        
+        # Install Azure CLI
+        curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+        # Install helm
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        echo "Setup complete" > /var/log/setup.log
         ''', adminUsername, adminSshPublicKey
       ))
     }
